@@ -1,4 +1,5 @@
 import numpy as np
+import time
 
 def gen_random(n): # Random binary list
     return np.random.randint(0,2,n)
@@ -17,18 +18,17 @@ def gen_mal_reviews(gt, Rh, mm, n, setting="zero"): # Generates 'mm' malicious r
         return [np.zeros(n) for i in range(mm)]
 
 def hamm_dist(r1, r2): # Hamming distance between two reviews
-    s = 0
-    for i in range(len(r1)):
-        if r1[i] != r2[i]:
-            s += 1
-    return s
+    return np.sum(np.abs(r1-r2)) # (r1-r2)[i] = 1 iff r1[i] != r2[i]
 
 def estimate(R, ep, p, alpha):
     q = 1 - p
     m = len(R)
     n = len(R[0])
 
-    ##### STEP 1: REMOVE REVIEWS TOO FAR FROM OTHERS #####
+    t1 = time.time()
+
+    ##### STEP 1: REMOVE REVIEWS TOO FAR FROM THE REST #####
+    # TODO: this step is a lot slower! Try to speed up double for loop
     marked1 = set()
     R1 = []
 
@@ -48,6 +48,9 @@ def estimate(R, ep, p, alpha):
         else:
             marked1.add(i)
 
+    #print("Step 1 took %.3f seconds." % (time.time() - t1))
+    t2 = time.time()
+
     ##### STEP 2: REMOVE REVIEWS TOO CLOSE TO OTHERS #####
     marked2 = set()
     for i in range(len(R1)):
@@ -61,6 +64,8 @@ def estimate(R, ep, p, alpha):
             if hamm_dist(ri, rj) < (1-ep)*2*p*q*n:
                 marked2.add(i)
                 marked2.add(j)
+
+    #print("Step 2 took %.3f seconds." % (time.time() - t2))
 
     R2 = [i for i in R1 if i not in marked2]
 
@@ -76,7 +81,7 @@ m = 100
 
 alpha = 0.25
 p = 0.75
-ep = 0.7
+ep = 0.64
 
 GT = gen_random(n)
 
@@ -85,5 +90,12 @@ Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="invert")
 
 R = Rh + Ra
 
-print(hamm_dist(estimate(R, ep, p, alpha), GT) / n)
-#print(estimate(R, ep, p, alpha))
+t1 = time.time()
+
+print("__________________________________________")
+print("| n: %d" % (n))
+print("| m: %d" % (m))
+print("| p: %.3f" % (p))
+print("| α: %.3f" % (alpha))
+print("| ε: %.3f" % (ep))
+print("| SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
