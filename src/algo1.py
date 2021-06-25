@@ -1,19 +1,22 @@
 import numpy as np
+import numpy.random as rn
 import time
 
 def gen_random(n): # Random binary list
-    return np.random.randint(0,2,n)
+    return rn.randint(0,2,n)
 
 def gen_honest_reviews(GT, mh, p): # Generates 'mh' honest reviews, where each review is correct on any particular with probability p
-    return [np.array([it if np.random.rand() < p else 1-it for it in GT]) for i in range(int(mh))]
+    return [np.array([it if rn.rand() < p else 1-it for it in GT]) for i in range(int(mh))]
 
-def gen_mal_reviews(gt, Rh, mm, n, setting="zero"): # Generates 'mm' malicious reviews, with options of
+def gen_mal_reviews(GT, Rh, mm, n, setting="zero", p=0): # Generates 'mm' malicious reviews, with options of
                                                     # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
     mm = int(np.floor(mm))
     if setting == "invert":
-        return [np.array([1-it for it in Rh[i]]) for i in range(len(Rh))] + [gen_random(n) for i in range(mm-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
+        return [np.array([1-it for it in Rh[i]]) for i in range(mm)] + [gen_random(n) for i in range(mm-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
     elif setting == "random":
         return [gen_random(n) for i in range(mm)]
+    elif setting == "pert":
+        return gen_honest_reviews(GT, mm, p)
     else:
         return [np.zeros(n) for i in range(mm)]
 
@@ -28,25 +31,17 @@ def estimate(R, ep, p, alpha):
     t1 = time.time()
 
     ##### STEP 1: REMOVE REVIEWS TOO FAR FROM THE REST #####
-    # TODO: this step is a lot slower! Try to speed up double for loop
-    marked1 = set()
-    R1 = []
+    neighbors = {i:1 for i in range(m)} # Number of reviews that each review is "close" to
 
     for i in range(m):
-        if i in marked1:
-            continue
         ri = R[i]
-        neighs = 0
-        for j in range(m):
-            if j in marked1:
-                continue
+        for j in range(i+1, m):
             rj = R[j]
             if hamm_dist(ri, rj) <= (1+ep)*2*p*q*n:
-                neighs += 1
-        if neighs >= (1-alpha)*m:
-            R1.append(i)
-        else:
-            marked1.add(i)
+                neighbors[i] += 1
+                neighbors[j] += 1
+
+    R1 = [i for i in neighbors if neighbors[i] >= (1-alpha) * m] # Only take reviews that have enough neighbors
 
     if debugging:
         print("Step 1 took %.3f seconds." % (time.time() - t1))
@@ -81,13 +76,37 @@ def estimate(R, ep, p, alpha):
 
 debugging = False
 
+def average_scores(M, iters): # See how performance varies with m
+    n = 200
+
+    alpha = 0.25
+    p = 0.75
+    ep = 0.142
+
+    totals = {m:0 for m in M}
+
+    for m in M:
+        for i in range(iters):
+            GT = gen_random(n)
+
+            Rh = gen_honest_reviews(GT, (1 - alpha) * m, p)
+            Ra = gen_mal_reviews(GT, Rh, alpha * m, n, setting="pert", p=1-p)
+
+            R = Rh + Ra
+            rn.shuffle(R)
+
+            score = (1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n)) * 100
+            totals[m] += score
+    return {m:totals[m]/iters for m in M}
+
+
 def main():
     n = 200
     m = 100
 
     alpha = 0.25
     p = 0.75
-    ep = 0.7
+    ep = 0.11
 
     GT = gen_random(n)
 
@@ -95,8 +114,11 @@ def main():
     Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="invert")
 
     R = Rh + Ra
+    rn.shuffle(R)
 
     t1 = time.time()
+
+    score = (1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100
 
     if not debugging:
         print("___________")
@@ -105,5 +127,5 @@ def main():
         print("| p: %.3f" % (p))
         print("| α: %.3f" % (alpha))
         print("| ε: %.3f" % (ep))
-    print("SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
-main()
+    print("SCORE: %.1f%%. Executed in %.3f seconds." % (score, time.time() - t1))
+print(average_scores(list(range(100,600,100)), 8))
