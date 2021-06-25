@@ -11,7 +11,7 @@ def gen_mal_reviews(gt, Rh, mm, n, setting="zero"): # Generates 'mm' malicious r
                                                     # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
     mm = int(np.floor(mm))
     if setting == "invert":
-        return [np.array([1-it for it in Rh[i]]) for i in range(len(Rh))] + [gen_random(n) for i in range(m-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
+        return [np.array([1-it for it in Rh[i]]) for i in range(len(Rh))] + [gen_random(n) for i in range(mm-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
     elif setting == "random":
         return [gen_random(n) for i in range(mm)]
     else:
@@ -79,29 +79,31 @@ def estimate(R, ep, p, alpha):
 
     return theta_hat
 
-n = 200
-m = 100
-
-alpha = 0.25
-p = 0.75
-ep = 0.64
-
-GT = gen_random(n)
-
-Rh = gen_honest_reviews(GT, (1-alpha)*m, p)
-Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="invert")
-
-R = Rh + Ra
-
-t1 = time.time()
-
 debugging = False
 
-if not debugging:
-    print("___________")
-    print("| n: %d" % (n))
-    print("| m: %d" % (m))
-    print("| p: %.3f" % (p))
-    print("| α: %.3f" % (alpha))
-    print("| ε: %.3f" % (ep))
-print("SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
+def main():
+    n = 200
+    m = 100
+
+    alpha = 0.25
+    p = 0.75
+    ep = 0.7
+
+    GT = gen_random(n)
+
+    Rh = gen_honest_reviews(GT, (1-alpha)*m, p)
+    Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="invert")
+
+    R = Rh + Ra
+
+    t1 = time.time()
+
+    if not debugging:
+        print("___________")
+        print("| n: %d" % (n))
+        print("| m: %d" % (m))
+        print("| p: %.3f" % (p))
+        print("| α: %.3f" % (alpha))
+        print("| ε: %.3f" % (ep))
+    print("SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
+main()
