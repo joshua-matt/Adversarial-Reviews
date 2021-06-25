@@ -8,17 +8,22 @@ def gen_random(n): # Random binary list
 def gen_honest_reviews(GT, mh, p): # Generates 'mh' honest reviews, where each review is correct on any particular with probability p
     return [np.array([it if rn.rand() < p else 1-it for it in GT]) for i in range(int(mh))]
 
-def gen_mal_reviews(GT, Rh, mm, n, setting="zero", p=0): # Generates 'mm' malicious reviews, with options of
-                                                    # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
+def gen_mal_reviews(GT, Rh, mm, n, setting="z", p_=0): # Generates 'mm' malicious reviews, with four types to choose from
     mm = int(np.floor(mm))
-    if setting == "invert":
-        return [np.array([1-it for it in Rh[i]]) for i in range(mm)] + [gen_random(n) for i in range(mm-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
-    elif setting == "random":
-        return [gen_random(n) for i in range(mm)]
-    elif setting == "pert":
-        return gen_honest_reviews(GT, mm, p)
-    else:
-        return [np.zeros(n) for i in range(mm)]
+    Ra = []
+
+    for i in range(mm):
+        c = setting[i%len(setting)] # Generates next review according to 'setting' string
+        if c == 'i':
+            Ra.append(np.array([1-it for it in Rh[rn.randint(len(Rh))]])) # Adds the inversion of a random honest review
+        elif c == 'r':
+            Ra.append(gen_random(n)) # Random review
+        elif c == 'p':
+            Ra.append(gen_honest_reviews(GT, 1, p_)[0]) # Flips each entry of GT with probability p_
+        else:
+            Ra.append(np.zeros(n)) # All zeros
+
+    return Ra
 
 def hamm_dist(r1, r2): # Hamming distance between two reviews
     return np.sum(np.abs(r1-r2)) # (r1-r2)[i] = 1 iff r1[i] != r2[i]
@@ -74,7 +79,7 @@ def estimate(R, ep, p, alpha):
 
     return theta_hat
 
-debugging = False
+debugging = True
 
 def average_scores(M, iters): # See how performance varies with m
     n = 200
@@ -106,12 +111,12 @@ def main():
 
     alpha = 0.25
     p = 0.75
-    ep = 0.11
+    ep = 0.12
 
     GT = gen_random(n)
 
     Rh = gen_honest_reviews(GT, (1-alpha)*m, p)
-    Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="invert")
+    Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="pr", p=1-p)
 
     R = Rh + Ra
     rn.shuffle(R)
@@ -128,4 +133,5 @@ def main():
         print("| α: %.3f" % (alpha))
         print("| ε: %.3f" % (ep))
     print("SCORE: %.1f%%. Executed in %.3f seconds." % (score, time.time() - t1))
-print(average_scores(list(range(100,600,100)), 8))
+#print(average_scores(list(range(100,600,100)), 8))
+main()
