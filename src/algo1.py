@@ -11,7 +11,7 @@ def gen_mal_reviews(gt, Rh, mm, n, setting="zero"): # Generates 'mm' malicious r
                                                     # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
     mm = int(np.floor(mm))
     if setting == "invert":
-        return [np.array([1-it for it in Rh[i]]) for i in range(len(Rh))] + [gen_random(n) for i in range(m-len(Rh))]
+        return [np.array([1-it for it in Rh[i]]) for i in range(len(Rh))] + [gen_random(n) for i in range(m-len(Rh))] # If alpha > 0.5, fill in rest with random reviews
     elif setting == "random":
         return [gen_random(n) for i in range(mm)]
     else:
@@ -48,7 +48,9 @@ def estimate(R, ep, p, alpha):
         else:
             marked1.add(i)
 
-    #print("Step 1 took %.3f seconds." % (time.time() - t1))
+    if debugging:
+        print("Step 1 took %.3f seconds." % (time.time() - t1))
+
     t2 = time.time()
 
     ##### STEP 2: REMOVE REVIEWS TOO CLOSE TO OTHERS #####
@@ -65,7 +67,8 @@ def estimate(R, ep, p, alpha):
                 marked2.add(i)
                 marked2.add(j)
 
-    #print("Step 2 took %.3f seconds." % (time.time() - t2))
+    if debugging:
+        print("Step 2 took %.3f seconds." % (time.time() - t2))
 
     R2 = [i for i in R1 if i not in marked2]
 
@@ -92,10 +95,13 @@ R = Rh + Ra
 
 t1 = time.time()
 
-print("__________________________________________")
-print("| n: %d" % (n))
-print("| m: %d" % (m))
-print("| p: %.3f" % (p))
-print("| α: %.3f" % (alpha))
-print("| ε: %.3f" % (ep))
-print("| SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
+debugging = False
+
+if not debugging:
+    print("___________")
+    print("| n: %d" % (n))
+    print("| m: %d" % (m))
+    print("| p: %.3f" % (p))
+    print("| α: %.3f" % (alpha))
+    print("| ε: %.3f" % (ep))
+print("SCORE: %.1f%%. Executed in %.3f seconds." % ((1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100, time.time() - t1))
