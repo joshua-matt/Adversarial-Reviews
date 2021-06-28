@@ -8,20 +8,21 @@ def gen_random(n): # Random binary list
 def gen_honest_reviews(GT, mh, p): # Generates 'mh' honest reviews, where each review is correct on any particular with probability p
     return [np.array([it if rn.rand() < p else 1-it for it in GT]) for i in range(int(mh))]
 
-def gen_mal_reviews(GT, Rh, mm, n, setting="z", p_=0): # Generates 'mm' malicious reviews, with four types to choose from
+def gen_mal_reviews(GT, Rh, mm, n, setting="z", p=0): # Generates 'mm' malicious reviews, with options of
+                                                    # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
     mm = int(np.floor(mm))
     Ra = []
 
     for i in range(mm):
-        c = setting[i%len(setting)] # Generates next review according to 'setting' string
+        c = setting[i%len(setting)]
         if c == 'i':
-            Ra.append(np.array([1-it for it in Rh[rn.randint(len(Rh))]])) # Adds the inversion of a random honest review
+            Ra.append(np.array([1-it for it in Rh[rn.randint(len(Rh))]]))
         elif c == 'r':
-            Ra.append(gen_random(n)) # Random review
+            Ra.append(gen_random(n))
         elif c == 'p':
-            Ra.append(gen_honest_reviews(GT, 1, p_)[0]) # Flips each entry of GT with probability p_
+            Ra.append(gen_honest_reviews(GT, 1, p)[0])
         else:
-            Ra.append(np.zeros(n)) # All zeros
+            Ra.append(np.zeros(n))
 
     return Ra
 
@@ -34,6 +35,7 @@ def estimate(R, ep, p, alpha):
     n = len(R[0])
 
     t1 = time.time()
+    tt = 0
 
     ##### STEP 1: REMOVE REVIEWS TOO FAR FROM THE REST #####
     neighbors = {i:1 for i in range(m)} # Number of reviews that each review is "close" to
@@ -42,7 +44,9 @@ def estimate(R, ep, p, alpha):
         ri = R[i]
         for j in range(i+1, m):
             rj = R[j]
+            t3 = time.time()
             if hamm_dist(ri, rj) <= (1+ep)*2*p*q*n:
+                tt += (time.time() - t3)
                 neighbors[i] += 1
                 neighbors[j] += 1
 
@@ -50,6 +54,7 @@ def estimate(R, ep, p, alpha):
 
     if debugging:
         print("Step 1 took %.3f seconds." % (time.time() - t1))
+        print("%.3f was spent on hamm_dist" % (tt))
 
     t2 = time.time()
 
@@ -70,8 +75,7 @@ def estimate(R, ep, p, alpha):
     if debugging:
         print("Step 2 took %.3f seconds." % (time.time() - t2))
 
-    R2 = [i for i in R1 if i not in marked2]
-
+    R2 = [R1[i] for i in range(len(R1)) if i not in marked2]
     if len(R2) == 0:
         raise ZeroDivisionError("The final set of reviews is empty. Increase your epsilon!")
 
@@ -79,7 +83,7 @@ def estimate(R, ep, p, alpha):
 
     return theta_hat
 
-debugging = True
+debugging = False
 
 def average_scores(M, iters): # See how performance varies with m
     n = 200
@@ -111,7 +115,7 @@ def main():
 
     alpha = 0.25
     p = 0.75
-    ep = 0.12
+    ep = 0.3
 
     GT = gen_random(n)
 
@@ -127,11 +131,11 @@ def main():
 
     if not debugging:
         print("___________")
-        print("| n: %d" % (n))
-        print("| m: %d" % (m))
-        print("| p: %.3f" % (p))
-        print("| α: %.3f" % (alpha))
-        print("| ε: %.3f" % (ep))
+        print("| n: %d" % n)
+        print("| m: %d" % m)
+        print("| p: %.3f" % p)
+        print("| α: %.3f" % alpha)
+        print("| ε: %.3f" % ep)
     print("SCORE: %.1f%%. Executed in %.3f seconds." % (score, time.time() - t1))
 #print(average_scores(list(range(100,600,100)), 8))
 main()
