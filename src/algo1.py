@@ -5,8 +5,19 @@ import time
 def gen_random(n): # Random binary list
     return rn.randint(0,2,n)
 
-def gen_honest_reviews(GT, mh, p): # Generates 'mh' honest reviews, where each review is correct on any particular with probability p
-    return [np.array([it if rn.rand() < p else 1-it for it in GT]) for i in range(int(mh))]
+def gen_honest_reviews(GT, mh, p, Rh_init): # Generates 'mh' honest reviews, where each review is correct on any particular with probability p
+    Rh = np.copy(Rh_init)
+
+    n = len(GT)
+    i = -1
+
+    while 1:
+        i += rn.geometric(1-p)
+        if i >= len(Rh):
+            break
+        Rh[i] = 1 - Rh[i]
+
+    return Rh.reshape((int(mh), n))
 
 def gen_mal_reviews(GT, Rh, mm, n, setting="z", p=0): # Generates 'mm' malicious reviews, with options of
                                                     # a) inverting the honest reviews, b) creating random reviews, or c) creating reviews of all 0
@@ -26,8 +37,11 @@ def gen_mal_reviews(GT, Rh, mm, n, setting="z", p=0): # Generates 'mm' malicious
 
     return Ra
 
+def gen_targeted_reviews(GT, mm, p, tar):
+    return [np.array(list(r[:tar]) + [1-GT[tar]] + list(r[tar+1:])) for r in gen_honest_reviews(GT, mm, p)]
+
 def hamm_dist(r1, r2): # Hamming distance between two reviews
-    return np.sum(np.abs(r1-r2)) # (r1-r2)[i] = 1 iff r1[i] != r2[i]
+    return np.count_nonzero(r1 != r2) # abs(r1-r2)[i] = 1 iff r1[i] != r2[i]
 
 def estimate(R, ep, p, alpha):
     q = 1 - p
@@ -79,9 +93,18 @@ def estimate(R, ep, p, alpha):
     if len(R2) == 0:
         raise ZeroDivisionError("The final set of reviews is empty. Increase your epsilon!")
 
-    theta_hat = np.int32(np.round(np.sum(np.array([R[i] for i in R2]), axis=0) / len(R2)))
+    theta_hat = majority_vote([R[i] for i in R2])
 
     return theta_hat
+
+def majority_vote(R):
+    return np.int32(np.round(np.sum(np.array(R), axis=0) / len(R)))
+
+def estimate_p(R):
+    medians = sorted([np.median([hamm_dist(r, r1) for r1 in R]) for r in R])
+    D_tilde = np.median(medians)# - (medians[-1]-medians[0])
+    #D_tilde = sorted(medians)[0]
+    return 0.5 + np.sqrt(1-(2*D_tilde/len(R[0])))/2#, 0.5 + np.sqrt(1-2*np.quantile(medians, 0.75)/len(R[0]))/2
 
 debugging = False
 
@@ -111,23 +134,27 @@ def average_scores(M, iters): # See how performance varies with m
 
 def main():
     n = 200
-    m = 100
+    m = 200
 
-    alpha = 0.25
+    alpha = 0.34
     p = 0.75
     ep = 0.3
 
     GT = gen_random(n)
+    Rh_init = np.array(list(GT) * alpha*m)
 
-    Rh = gen_honest_reviews(GT, (1-alpha)*m, p)
-    Ra = gen_mal_reviews(GT, Rh, alpha*m, n, setting="pr", p=1-p)
+
+    Rh = gen_honest_reviews(GT, (1-alpha)*m, p, Rh_init)
+    Ra = gen_targeted_reviews(GT, alpha*m, p, 0)
 
     R = Rh + Ra
     rn.shuffle(R)
 
     t1 = time.time()
 
-    score = (1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100
+    est = estimate(R, ep, p, alpha)
+
+    score = est[0] == GT[0]#(1 - (hamm_dist(estimate(R, ep, p, alpha), GT) / n))*100
 
     if not debugging:
         print("___________")
@@ -137,5 +164,5 @@ def main():
         print("| α: %.3f" % alpha)
         print("| ε: %.3f" % ep)
     print("SCORE: %.1f%%. Executed in %.3f seconds." % (score, time.time() - t1))
-#print(average_scores(list(range(100,600,100)), 8))
-main()
+
+#main()
